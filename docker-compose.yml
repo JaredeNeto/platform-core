@@ -9,4 +9,7 @@ services:
       NODE_ENV: development
       PORT: 3000
       LOG_LEVEL: info
+      JWT_SECRET: local-dev-secret-do-not-use-in-production
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW_MS: 60000
     restart: unless-stopped
