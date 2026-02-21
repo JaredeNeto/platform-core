@@ -1,12 +1,36 @@
 import Fastify from 'fastify'
+import fastifyJwt from '@fastify/jwt'
+import fastifyRateLimit from '@fastify/rate-limit'
+
 import { logger } from './observability/logger.js'
+import { errorHandler } from './middleware/errorHandler.js'
+import { authRoutes } from './routes/auth.js'
+import { resourceRoutes } from './routes/resource.js'
 
 async function buildServer() {
   const app = Fastify({
-    logger: false, // Usamos pino diretamente para controle de structured logging
+    logger: false,
     genReqId: () => crypto.randomUUID(),
     trustProxy: true,
   })
+
+  // --- Plugins ---
+
+  await app.register(fastifyJwt, {
+    secret: process.env.JWT_SECRET ?? 'fallback-secret-not-for-production',
+  })
+
+  await app.register(fastifyRateLimit, {
+    max: Number(process.env.RATE_LIMIT_MAX ?? 100),
+    timeWindow: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
+    errorResponseBuilder: (_request, context) => ({
+      error: 'rate_limit_exceeded',
+      message: `Too many requests. Retry after ${context.after}`,
+    }),
+  })
+
+  // --- Error handler ---
+  app.setErrorHandler(errorHandler)
 
   // --- Health endpoints ---
 
@@ -25,6 +49,10 @@ async function buildServer() {
       },
     })
   })
+
+  // --- Routes ---
+  await app.register(authRoutes)
+  await app.register(resourceRoutes)
 
   // --- Request logging ---
 
