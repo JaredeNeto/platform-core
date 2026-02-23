@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
 import { requireScope } from '../middleware/auth.js'
 import { PaginationQuerySchema, ResourceListResponse } from '../contracts/resource.js'
+import { trace } from '@opentelemetry/api'
 
 // Simulated data layer — in production: replace with DB query
 function generateMockResources(count: number) {
@@ -21,6 +22,8 @@ export async function resourceRoutes(app: FastifyInstance): Promise<void> {
     '/api/resources',
     { preHandler: requireScope('resources:read') },
     async (request, reply) => {
+      const span = trace.getActiveSpan()
+
       const parsed = PaginationQuerySchema.safeParse(request.query)
 
       if (!parsed.success) {
@@ -32,6 +35,14 @@ export async function resourceRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const { page, pageSize } = parsed.data
+
+      // Enriquece o span com contexto da query
+      // Em produção: esses atributos permitem filtrar traces por usuário e paginação no Datadog
+      span?.setAttributes({
+        'query.page': page,
+        'query.page_size': pageSize,
+        'auth.subject': request.authPayload?.sub ?? 'unknown',
+      })
 
       const data = generateMockResources(Math.min(pageSize, MOCK_TOTAL))
 

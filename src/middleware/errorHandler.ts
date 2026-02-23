@@ -1,6 +1,7 @@
 import { FastifyError, FastifyRequest, FastifyReply } from 'fastify'
 import { ZodError } from 'zod'
 import { logger } from '../observability/logger.js'
+import { trace, SpanStatusCode } from '@opentelemetry/api'
 
 interface ErrorResponse {
   error: string
@@ -14,11 +15,13 @@ export function errorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
+  const span = trace.getActiveSpan()
   const requestId = request.id
 
   // Zod validation errors → 400
   if (error instanceof ZodError) {
     logger.warn({ requestId, issues: error.issues }, 'Validation error')
+    span?.setStatus({ code: SpanStatusCode.ERROR, message: 'validation_error' })
 
     const response: ErrorResponse = {
       error: 'validation_error',
@@ -40,6 +43,8 @@ export function errorHandler(
     logger.warn({ requestId, statusCode, message: error.message }, 'Client error')
   } else {
     logger.error({ requestId, statusCode, err: error }, 'Unhandled server error')
+    // Só marca como erro de span em 5xx — erros de cliente (4xx) são esperados
+    span?.setStatus({ code: SpanStatusCode.ERROR, message: error.message })
   }
 
   const response: ErrorResponse = {
