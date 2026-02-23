@@ -10,6 +10,23 @@ services:
       PORT: 3000
       LOG_LEVEL: info
       JWT_SECRET: local-dev-secret-do-not-use-in-production
+      OTEL_SERVICE_NAME: platform-core
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       RATE_LIMIT_MAX: 100
       RATE_LIMIT_WINDOW_MS: 60000
+    depends_on:
+      - otel-collector
+    restart: unless-stopped
+
+  # OTel Collector — recebe traces via OTLP e exibe no stdout local
+  # Em produção: substituir o exporter debug por Datadog, Grafana Alloy, etc.
+  # A aplicação não precisa mudar — só a config do collector muda
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "55679:55679" # zpages — debug UI
+    volumes:
+      - ./otel-collector.yml:/etc/otelcol-contrib/config.yaml
     restart: unless-stopped

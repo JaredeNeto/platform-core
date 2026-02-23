@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import fastifyRateLimit from '@fastify/rate-limit'
+import './observability/tracer.js'
 
 import { logger } from './observability/logger.js'
 import { errorHandler } from './middleware/errorHandler.js'
